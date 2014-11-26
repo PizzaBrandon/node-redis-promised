@@ -23,13 +23,13 @@ function lpad(input, len, chr) {
 
 metrics.Histogram.prototype.print_line = function () {
     var obj = this.printObj();
-    
+
     return lpad(obj.min, 4) + "/" + lpad(obj.max, 4) + "/" + lpad(obj.mean.toFixed(2), 7) + "/" + lpad(obj.p95.toFixed(2), 7);
 };
 
 function Test(args) {
     this.args = args;
-    
+
     this.callback = null;
     this.clients = [];
     this.clients_ready = 0;
@@ -37,7 +37,7 @@ function Test(args) {
     this.commands_completed = 0;
     this.max_pipeline = this.args.pipeline || num_requests;
     this.client_options = args.client_options || client_options;
-    
+
     this.connect_latency = new metrics.Histogram();
     this.ready_latency = new metrics.Histogram();
     this.command_latency = new metrics.Histogram();
@@ -55,7 +55,7 @@ Test.prototype.run = function (callback) {
 
 Test.prototype.new_client = function (id) {
     var self = this, new_client;
-    
+
     new_client = redis.createClient(6379, "127.0.0.1", this.client_options);
     new_client.create_time = Date.now();
 
@@ -66,7 +66,7 @@ Test.prototype.new_client = function (id) {
     new_client.on("ready", function () {
         if (! versions_logged) {
             console.log("Client count: " + num_clients + ", node version: " + process.versions.node + ", server version: " +
-                new_client.server_info.redis_version + ", parser: " + new_client.reply_parser.name);
+                new_client.serverInfo.redis_version + ", parser: " + new_client.reply_parser.name);
             versions_logged = true;
         }
         self.ready_latency.update(Date.now() - new_client.create_time);
@@ -94,7 +94,7 @@ Test.prototype.fill_pipeline = function () {
         pipeline++;
         this.send_next();
     }
-    
+
     if (this.commands_completed === num_requests) {
         this.print_stats();
         this.stop_clients();
@@ -103,7 +103,7 @@ Test.prototype.fill_pipeline = function () {
 
 Test.prototype.stop_clients = function () {
     var self = this;
-    
+
     this.clients.forEach(function (client, pos) {
         if (pos === self.clients.length - 1) {
             client.quit(function (err, res) {
@@ -132,7 +132,7 @@ Test.prototype.send_next = function () {
 
 Test.prototype.print_stats = function () {
     var duration = Date.now() - this.test_start;
-    
+
     console.log("min/max/avg/p95: " + this.command_latency.print_line() + " " + lpad(duration, 6) + "ms total, " +
         lpad((num_requests / (duration / 1000)).toFixed(2), 8) + " ops/sec");
 };

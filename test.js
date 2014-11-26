@@ -6,10 +6,10 @@ var redis = require("./index"),
     client = redis.createClient(PORT, HOST),
     client2 = redis.createClient(PORT, HOST),
     client3 = redis.createClient(PORT, HOST),
-    bclient = redis.createClient(PORT, HOST, { return_buffers: true }),
+    bclient = redis.createClient(PORT, HOST, { returnBuffers: true }),
     assert = require("assert"),
     crypto = require("crypto"),
-    util = require("./lib/util"),
+    util = require("util"),
     fork = require("child_process").fork,
     test_db_num = 15, // this DB will be flushed and used for testing
     tests = {},
@@ -23,7 +23,7 @@ redis.debug_mode = process.argv[2];
 
 function server_version_at_least(connection, desired_version) {
     // Return true if the server version >= desired_version
-    var version = connection.server_info.versions;
+    var version = connection.serverInfo.versions;
     for (var i = 0; i < 3; i++) {
         if (version[i] > desired_version[i]) return true;
         if (version[i] < desired_version[i]) return false;
@@ -115,366 +115,7 @@ next = function next(name) {
 
 // Tests are run in the order they are defined, so FLUSHDB should always be first.
 
-tests.IPV4 = function () {
-    var ipv4Client = redis.createClient( PORT, "127.0.0.1", { "family" : "IPv4" } );
 
-    ipv4Client.once("ready", function start_tests() {
-        console.log("Connected to " + ipv4Client.address + ", Redis server version " + ipv4Client.server_info.redis_version + "\n");
-        console.log("Using reply parser " + ipv4Client.reply_parser.name);
-
-        ipv4Client.quit();
-        run_next_test();
-    });
-
-    ipv4Client.on('end', function () {
-
-    });
-
-    // Exit immediately on connection failure, which triggers "exit", below, which fails the test
-    ipv4Client.on("error", function (err) {
-        console.error("client: " + err.stack);
-        process.exit();
-    });
-}
-
-tests.IPV6 = function () {
-    if (!server_version_at_least(client, [2, 8, 0])) {
-        console.log("Skipping IPV6 for old Redis server version < 2.8.0");
-        return run_next_test();
-    }
-    var ipv6Client = redis.createClient( PORT, "::1", { "family" : "IPv6" } );
-
-    ipv6Client.once("ready", function start_tests() {
-        console.log("Connected to " + ipv6Client.address + ", Redis server version " + ipv6Client.server_info.redis_version + "\n");
-        console.log("Using reply parser " + ipv6Client.reply_parser.name);
-
-        ipv6Client.quit();
-        run_next_test();
-    });
-
-    ipv6Client.on('end', function () {
-
-    });
-
-    // Exit immediately on connection failure, which triggers "exit", below, which fails the test
-    ipv6Client.on("error", function (err) {
-        console.error("client: " + err.stack);
-        process.exit();
-    });
-}
-
-tests.UNIX_SOCKET = function () {
-    var unixClient = redis.createClient('/tmp/redis.sock');
-
-    // if this fails, check the permission of unix socket.
-    // unixsocket /tmp/redis.sock
-    // unixsocketperm 777
-
-    unixClient.once('ready', function start_tests(){
-        console.log("Connected to " + unixClient.address + ", Redis server version " + unixClient.server_info.redis_version + "\n");
-        console.log("Using reply parser " + unixClient.reply_parser.name);
-
-        unixClient.quit();
-        run_next_test();
-    });
-
-    unixClient.on( 'end', function(){
-
-    });
-
-    // Exit immediately on connection failure, which triggers "exit", below, which fails the test
-    unixClient.on("error", function (err) {
-        console.error("client: " + err.stack);
-        process.exit();
-    });
-}
-
-tests.FLUSHDB = function () {
-    var name = "FLUSHDB";
-    client.select(test_db_num, require_string("OK", name));
-    client2.select(test_db_num, require_string("OK", name));
-    client3.select(test_db_num, require_string("OK", name));
-    client.mset("flush keys 1", "flush val 1", "flush keys 2", "flush val 2", require_string("OK", name));
-    client.FLUSHDB(require_string("OK", name));
-    client.dbsize(last(name, require_number(0, name)));
-};
-
-tests.INCR = function () {
-    var name = "INCR";
-
-    if (bclient.reply_parser.name == "hiredis") {
-        console.log("Skipping INCR buffer test with hiredis");
-        return next(name);
-    }
-
-    // Test incr with the maximum JavaScript number value. Since we are
-    // returning buffers we should get back one more as a Buffer.
-    bclient.set("seq", "9007199254740992", function (err, result) {
-        assert.strictEqual(result.toString(), "OK");
-        bclient.incr("seq", function (err, result) {
-            assert.strictEqual("9007199254740993", result.toString());
-            next(name);
-        });
-    });
-};
-
-tests.MULTI_1 = function () {
-    var name = "MULTI_1", multi1, multi2;
-
-    // Provoke an error at queue time
-    multi1 = client.multi();
-    multi1.mset("multifoo", "10", "multibar", "20", require_string("OK", name));
-    multi1.set("foo2", require_error(name));
-    multi1.incr("multifoo", require_number(11, name));
-    multi1.incr("multibar", require_number(21, name));
-    multi1.exec(function () {
-        require_error(name);
-
-        // Redis 2.6.5+ will abort transactions with errors
-        // see: http://redis.io/topics/transactions
-        var multibar_expected = 22;
-        var multifoo_expected = 12;
-        if (server_version_at_least(client, [2, 6, 5])) {
-            multibar_expected = 1;
-            multifoo_expected = 1;
-        }
-
-        // Confirm that the previous command, while containing an error, still worked.
-        multi2 = client.multi();
-        multi2.incr("multibar", require_number(multibar_expected, name));
-        multi2.incr("multifoo", require_number(multifoo_expected, name));
-        multi2.exec(function (err, replies) {
-            assert.strictEqual(multibar_expected, replies[0]);
-            assert.strictEqual(multifoo_expected, replies[1]);
-            next(name);
-        });
-    });
-};
-
-tests.MULTI_2 = function () {
-    var name = "MULTI_2";
-
-    // test nested multi-bulk replies
-    client.multi([
-        ["mget", "multifoo", "multibar", function (err, res) {
-            assert.strictEqual(2, res.length, name);
-            assert.strictEqual("12", res[0].toString(), name);
-            assert.strictEqual("22", res[1].toString(), name);
-        }],
-        ["set", "foo2", require_error(name)],
-        ["incr", "multifoo", require_number(13, name)],
-        ["incr", "multibar", require_number(23, name)]
-
-    ]).exec(function (err, replies) {
-
-        if (server_version_at_least(client, [2, 6, 5])) {
-            assert.notEqual(err, null, name);
-            assert.equal(replies, undefined, name);
-        } else {
-            assert.strictEqual(2, replies[0].length, name);
-            assert.strictEqual("12", replies[0][0].toString(), name);
-            assert.strictEqual("22", replies[0][1].toString(), name);
-
-            assert.strictEqual("13", replies[1].toString());
-            assert.strictEqual("23", replies[2].toString());
-        }
-        next(name);
-    });
-};
-
-tests.MULTI_3 = function () {
-    var name = "MULTI_3";
-
-    client.sadd("some set", "mem 1");
-    client.sadd("some set", "mem 2");
-    client.sadd("some set", "mem 3");
-    client.sadd("some set", "mem 4");
-
-    // make sure empty mb reply works
-    client.del("some missing set");
-    client.smembers("some missing set", function (err, reply) {
-        // make sure empty mb reply works
-        assert.strictEqual(true, is_empty_array(reply), name);
-    });
-
-    // test nested multi-bulk replies with empty mb elements.
-    client.multi([
-        ["smembers", "some set"],
-        ["del", "some set"],
-        ["smembers", "some set"]
-    ])
-    .scard("some set")
-    .exec(function (err, replies) {
-        assert.strictEqual(true, is_empty_array(replies[2]), name);
-        next(name);
-    });
-};
-
-tests.MULTI_4 = function () {
-    var name = "MULTI_4";
-
-    client.multi()
-        .mset('some', '10', 'keys', '20')
-        .incr('some')
-        .incr('keys')
-        .mget('some', 'keys')
-        .exec(function (err, replies) {
-            assert.strictEqual(null, err);
-            assert.equal('OK', replies[0]);
-            assert.equal(11, replies[1]);
-            assert.equal(21, replies[2]);
-            assert.equal(11, replies[3][0].toString());
-            assert.equal(21, replies[3][1].toString());
-            next(name);
-        });
-};
-
-tests.MULTI_5 = function () {
-    var name = "MULTI_5";
-
-    // test nested multi-bulk replies with nulls.
-    client.multi([
-        ["mget", ["multifoo", "some", "random value", "keys"]],
-        ["incr", "multifoo"]
-    ])
-    .exec(function (err, replies) {
-        assert.strictEqual(replies.length, 2, name);
-        assert.strictEqual(replies[0].length, 4, name);
-        next(name);
-    });
-};
-
-tests.MULTI_6 = function () {
-    var name = "MULTI_6";
-
-    client.multi()
-        .hmset("multihash", "a", "foo", "b", 1)
-        .hmset("multihash", {
-            extra: "fancy",
-            things: "here"
-        })
-        .hgetall("multihash")
-        .exec(function (err, replies) {
-            assert.strictEqual(null, err);
-            assert.equal("OK", replies[0]);
-            assert.equal(Object.keys(replies[2]).length, 4);
-            assert.equal("foo", replies[2].a);
-            assert.equal("1", replies[2].b);
-            assert.equal("fancy", replies[2].extra);
-            assert.equal("here", replies[2].things);
-            next(name);
-        });
-};
-
-tests.MULTI_7 = function () {
-    var name = "MULTI_7";
-
-    if (bclient.reply_parser.name != "javascript") {
-        console.log("Skipping wire-protocol test for 3rd-party parser");
-        return next(name);
-    }
-
-    var p = require("./lib/parser/javascript");
-    var parser = new p.Parser(false);
-    var reply_count = 0;
-    function check_reply(reply) {
-        assert.deepEqual(reply, [['a']], "Expecting multi-bulk reply of [['a']]");
-        reply_count++;
-        assert.notEqual(reply_count, 4, "Should only parse 3 replies");
-    }
-    parser.on("reply", check_reply);
-
-    parser.execute(new Buffer('*1\r\n*1\r\n$1\r\na\r\n'));
-
-    parser.execute(new Buffer('*1\r\n*1\r'));
-    parser.execute(new Buffer('\n$1\r\na\r\n'));
-
-    parser.execute(new Buffer('*1\r\n*1\r\n'));
-    parser.execute(new Buffer('$1\r\na\r\n'));
-
-    next(name);
-};
-
-
-tests.MULTI_EXCEPTION_1 = function() {
-    var name = "MULTI_EXCEPTION_1";
-
-    if (!server_version_at_least(client, [2, 6, 5])) {
-        console.log("Skipping " + name + " for old Redis server version < 2.6.5");
-        return next(name);
-    }
-
-    client.multi().set("foo").exec(function (err, reply) {
-        assert(Array.isArray(err), "err should be an array");
-        assert.equal(2, err.length, "err should have 2 items");
-        assert(err[0].message.match(/ERR/), "First error message should contain ERR");
-        assert(err[1].message.match(/EXECABORT/), "First error message should contain EXECABORT");
-        next(name);
-    });
-};
-
-tests.MULTI_8 = function () {
-    var name = "MULTI_8", multi1, multi2;
-
-    // Provoke an error at queue time
-    multi1 = client.multi();
-    multi1.mset("multifoo_8", "10", "multibar_8", "20", require_string("OK", name));
-    multi1.set("foo2", require_error(name));
-    multi1.set("foo3", require_error(name));
-    multi1.incr("multifoo_8", require_number(11, name));
-    multi1.incr("multibar_8", require_number(21, name));
-    multi1.exec(function () {
-        require_error(name);
-
-        // Redis 2.6.5+ will abort transactions with errors
-        // see: http://redis.io/topics/transactions
-        var multibar_expected = 22;
-        var multifoo_expected = 12;
-        if (server_version_at_least(client, [2, 6, 5])) {
-            multibar_expected = 1;
-            multifoo_expected = 1;
-        }
-
-        // Confirm that the previous command, while containing an error, still worked.
-        multi2 = client.multi();
-        multi2.incr("multibar_8", require_number(multibar_expected, name));
-        multi2.incr("multifoo_8", require_number(multifoo_expected, name));
-        multi2.exec(function (err, replies) {
-            assert.strictEqual(multibar_expected, replies[0]);
-            assert.strictEqual(multifoo_expected, replies[1]);
-            next(name);
-        });
-    });
-};
-
-tests.FWD_ERRORS_1 = function () {
-    var name = "FWD_ERRORS_1";
-
-    var toThrow = new Error("Forced exception");
-    var recordedError = null;
-
-    var originalHandlers = client3.listeners("error");
-    client3.removeAllListeners("error");
-    client3.once("error", function (err) {
-        recordedError = err;
-    });
-
-    client3.on("message", function (channel, data) {
-        console.log("incoming");
-        if (channel == name) {
-            assert.equal(data, "Some message");
-            throw toThrow;
-        }
-    });
-    client3.subscribe(name);
-
-    client.publish(name, "Some message");
-    setTimeout(function () {
-        client3.listeners("error").push(originalHandlers);
-        assert.equal(recordedError, toThrow, "Should have caught our forced exception");
-        next(name);
-    }, 150);
-};
 
 tests.EVAL_1 = function () {
     var name = "EVAL_1";
@@ -483,30 +124,7 @@ tests.EVAL_1 = function () {
         console.log("Skipping " + name + " for old Redis server version < 2.5.x");
         return next(name);
     }
-
-    // test {EVAL - Lua integer -> Redis protocol type conversion}
-    client.eval("return 100.5", 0, require_number(100, name));
-    // test {EVAL - Lua string -> Redis protocol type conversion}
-    client.eval("return 'hello world'", 0, require_string("hello world", name));
-    // test {EVAL - Lua true boolean -> Redis protocol type conversion}
-    client.eval("return true", 0, require_number(1, name));
-    // test {EVAL - Lua false boolean -> Redis protocol type conversion}
-    client.eval("return false", 0, require_null(name));
-    // test {EVAL - Lua status code reply -> Redis protocol type conversion}
-    client.eval("return {ok='fine'}", 0, require_string("fine", name));
-    // test {EVAL - Lua error reply -> Redis protocol type conversion}
-    client.eval("return {err='this is an error'}", 0, require_error(name));
-    // test {EVAL - Lua table -> Redis protocol type conversion}
-    client.eval("return {1,2,3,'ciao',{1,2}}", 0, function (err, res) {
-        assert.strictEqual(5, res.length, name);
-        assert.strictEqual(1, res[0], name);
-        assert.strictEqual(2, res[1], name);
-        assert.strictEqual(3, res[2], name);
-        assert.strictEqual("ciao", res[3], name);
-        assert.strictEqual(2, res[4].length, name);
-        assert.strictEqual(1, res[4][0], name);
-        assert.strictEqual(2, res[4][1], name);
-    });
+//TODO: Start here
     // test {EVAL - Are the KEYS and ARGS arrays populated correctly?}
     client.eval("return {KEYS[1],KEYS[2],ARGV[1],ARGV[2]}", 2, "a", "b", "c", "d", function (err, res) {
         assert.strictEqual(4, res.length, name);
@@ -2228,8 +1846,8 @@ run_next_test = function run_next_test() {
 };
 
 client.once("ready", function start_tests() {
-    console.log("Connected to " + client.address + ", Redis server version " + client.server_info.redis_version + "\n");
-    console.log("Using reply parser " + client.reply_parser.name);
+    console.log("Connected to " + client.address + ", Redis server version " + client.serverInfo.redis_version + "\n");
+    console.log("Using reply parser " + client.replyParser.name);
 
     run_next_test();
 
