@@ -1,4 +1,6 @@
-var client  = require("../index").createClient(),
+/* eslint-disable */
+
+var client  = require("redis-promised").createClient(),
     util = require("util");
 
 client.monitor(function (err, res) {

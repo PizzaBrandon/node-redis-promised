@@ -1,4 +1,6 @@
-var redis = require("redis"),
+/* eslint-disable */
+
+var redis = require("redis-promised"),
     client = redis.createClient();
 
 // Extend the RedisClient prototype to add a custom method

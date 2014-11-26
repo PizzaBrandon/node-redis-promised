@@ -1,4 +1,6 @@
-var redis = require("redis"),
+/* eslint-disable */
+
+var redis = require("redis-promised"),
     client1 = redis.createClient(),
     client2 = redis.createClient(),
     client3 = redis.createClient(),

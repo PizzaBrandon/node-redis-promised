@@ -1,4 +1,6 @@
-var redis = require("redis"),
+/* eslint-disable */
+
+var redis = require("redis-promised"),
     client = redis.createClient("/tmp/redis.sock"),
     profiler = require("v8-profiler");
 

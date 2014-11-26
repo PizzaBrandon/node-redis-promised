@@ -1,4 +1,6 @@
-var redis = require("../index"),
+/* eslint-disable */
+
+var redis = require("redis-promised"),
     client = redis.createClient(null, null, {
         command_queue_high_water: 5,
         command_queue_low_water: 1

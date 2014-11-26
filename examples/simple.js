@@ -1,4 +1,6 @@
-var redis = require("redis"),
+/* eslint-disable */
+
+var redis = require("redis-promised"),
     client = redis.createClient();
 
 client.on("error", function (err) {

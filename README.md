@@ -43,12 +43,6 @@ Here is an example of passing an array of arguments and a callback:
 client.mset(["test keys 1", "test val 1", "test keys 2", "test val 2"], function (err, res) {});
 ```
 
-Here is that same call in the second style:
-
-```js
-client.mset("test keys 1", "test val 1", "test keys 2", "test val 2", function (err, res) {});
-```
-
 Note that in either form the `callback` is optional:
 
 ```js
