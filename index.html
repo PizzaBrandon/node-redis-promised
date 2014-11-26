@@ -1,0 +1,70 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="chrome=1">
+    <title>node-redis-promised by PizzaBrandon</title>
+
+    <link rel="stylesheet" href="stylesheets/styles.css">
+    <link rel="stylesheet" href="stylesheets/pygment_trac.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+    <!--[if lt IE 9]>
+    <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+  </head>
+  <body>
+    <div class="wrapper">
+      <header>
+        <h1>node-redis-promised</h1>
+        <p>A Redis client for Node with Promise support</p>
+
+        <p class="view"><a href="https://github.com/PizzaBrandon/node-redis-promised">View the Project on GitHub <small>PizzaBrandon/node-redis-promised</small></a></p>
+
+
+        <ul>
+          <li><a href="https://github.com/PizzaBrandon/node-redis-promised/zipball/master">Download <strong>ZIP File</strong></a></li>
+          <li><a href="https://github.com/PizzaBrandon/node-redis-promised/tarball/master">Download <strong>TAR Ball</strong></a></li>
+          <li><a href="https://github.com/PizzaBrandon/node-redis-promised">View On <strong>GitHub</strong></a></li>
+        </ul>
+      </header>
+      <section>
+        <p>This is a complete promise-ready Redis client for node.js based on <a href="https://github.com/mranney/node_redis">mranney/node_redis</a>. It supports all Redis commands. This library adds promise support while also maintaining the original callback support.</p>
+
+<p>Install with:</p>
+
+<pre><code>npm install redis-promised
+</code></pre>
+
+<p>Pieter Noordhuis has provided a binding to the official <code>hiredis</code> C library, which is non-blocking and fast. To use <code>hiredis</code>, do:</p>
+
+<pre><code>npm install hiredis redis-promised
+</code></pre>
+
+<p>If <code>hiredis</code> is installed, <code>redis-promised</code> will use it by default. Otherwise, a pure JavaScript parser will be used.</p>
+
+<p>If you use <code>hiredis</code>, be sure to rebuild it whenever you upgrade your version of node. There are mysterious failures that can happen between node and native code modules after a node upgrade.</p>
+
+<h2>
+<a id="license" class="anchor" href="#license" aria-hidden="true"><span class="octicon octicon-link"></span></a>LICENSE</h2>
+
+<p>MIT <a href="http://brandon.mit-license.org">http://brandon.mit-license.org</a></p>
+      </section>
+      <footer>
+        <p>This project is maintained by <a href="https://github.com/PizzaBrandon">PizzaBrandon</a></p>
+        <p><small>Hosted on GitHub Pages &mdash; Theme by <a href="https://github.com/orderedlist">orderedlist</a></small></p>
+      </footer>
+    </div>
+    <script src="javascripts/scale.fix.js"></script>
+              <script type="text/javascript">
+            var gaJsHost = (("https:" == document.location.protocol) ? "https://ssl." : "http://www.");
+            document.write(unescape("%3Cscript src='" + gaJsHost + "google-analytics.com/ga.js' type='text/javascript'%3E%3C/script%3E"));
+          </script>
+          <script type="text/javascript">
+            try {
+              var pageTracker = _gat._getTracker("UA-42946241-4");
+            pageTracker._trackPageview();
+            } catch(err) {}
+          </script>
+
+  </body>
+</html>
