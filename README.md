@@ -259,7 +259,7 @@ client.HMSET(key1, "0123456789", "abcdefghij", "some manner of key", "a type of 
 Here is a simple example of the API for publish / subscribe. This program opens two client connections, subscribes to a channel on one of them, and publishes to that channel on the other:
 
 ```js
-var redis = require("redis-promises"),
+var redis = require("redis-promised"),
     client1 = redis.createClient(),
     client2 = redis.createClient(),
     msg_count = 0;
