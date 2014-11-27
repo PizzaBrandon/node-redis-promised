@@ -22,7 +22,7 @@
   "bugs": {
     "url": "https://github.com/PizzaBrandon/node-redis-promised/issues"
   },
-  "homepage": "https://github.com/PizzaBrandon/node-redis-promised",
+  "homepage": "http://pizzabrandon.github.io/node-redis-promised",
   "dependencies": {
     "bluebird": "^2.3.11"
   },
