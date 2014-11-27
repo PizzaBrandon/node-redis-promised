@@ -30,6 +30,30 @@ describe('test client connectivity', function() {
 		done();
 	});
 
+	it('should connect correctly with defaults', function(done) {
+		client = redis.createClient();
+
+		client.once('ready', function testConnectivity() {
+			console.log('Connected to ' + client.address + ', Redis server version ' + client.serverInfo.redis_version + '\n');
+			console.log('Using reply parser ' + client.replyParser.name);
+
+			serverVersion = client.serverInfo.versions;
+
+			done();
+		});
+
+		client.on('end', function() {
+			// Do nothing
+		});
+
+		// Exit immediately on connection failure, which triggers 'exit', below, which fails the test
+		client.on('error', function(err) {
+			console.error('client: ' + err.stack);
+			throw err;
+		});
+	});
+
+
 	it('should connect correctly over IPV4', function(done) {
 		client = redis.createClient(PORT, HOST, {
 			'family': 'IPv4'

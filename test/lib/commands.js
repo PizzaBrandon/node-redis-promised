@@ -4,6 +4,7 @@
 var redis = require('../../index');
 var chai = require('chai');
 var chaiAsPromised = require('chai-as-promised');
+var crypto = require('crypto');
 var should = chai.should();
 chai.use(chaiAsPromised);
 
@@ -209,6 +210,133 @@ describe('test redis commands', function() {
 					Array.isArray(reply).should.equal(true);
 					reply.length.should.equal(5);
 					reply.should.deep.equal([1, 2, 3, 'ciao', [1, 2]]);
+				});
+		});
+
+		it('should evaluate KEYS and ARGS arrays', function() {
+			if (!checkMinServerVersion([2, 6, 0])) {
+				console.log('Skipping for old Redis server version < 2.6.0');
+				return false;
+			}
+
+			return client.eval('return {KEYS[1],KEYS[2],ARGV[1],ARGV[2]}', 2, 'a', 'b', 'c', 'd')
+				.then(function(reply) {
+					Array.isArray(reply).should.equal(true);
+					reply.length.should.equal(4);
+					reply.should.deep.equal(['a', 'b', 'c', 'd']);
+				});
+		});
+
+		it('should evaluate params in array format', function() {
+			if (!checkMinServerVersion([2, 6, 0])) {
+				console.log('Skipping for old Redis server version < 2.6.0');
+				return false;
+			}
+
+			return client.eval(['return {KEYS[1],KEYS[2],ARGV[1],ARGV[2]}', 2, 'a', 'b', 'c', 'd'])
+				.then(function(reply) {
+					Array.isArray(reply).should.equal(true);
+					reply.length.should.equal(4);
+					reply.should.deep.equal(['a', 'b', 'c', 'd']);
+				});
+		});
+
+		it('should handle EVALSHA', function() {
+			if (!checkMinServerVersion([2, 6, 0])) {
+				console.log('Skipping for old Redis server version < 2.6.0');
+				return false;
+			}
+
+			var source = 'return redis.call(\'get\', \'sha test\')',
+				sha = crypto.createHash('sha1').update(source).digest('hex');
+
+			return client.set('sha test', 'eval get sha test')
+				.then(function(reply) {
+					reply.should.equal('OK');
+					return client.eval(source, 0);
+				})
+				.then(function(reply) {
+					reply.should.equal('eval get sha test');
+					return client.evalsha(sha, 0);
+				})
+				.then(function(reply) {
+					reply.should.equal('eval get sha test');
+					return client.evalsha('ffffffffffffffffffffffffffffffffffffffff', 0);
+				})
+				.then(function(reply) {
+					should.not.exist(reply);
+					false.should.equal(true);
+				})
+				.catch(function(err) {
+					should.exist(err);
+					err.should.be.instanceof(Error);
+				});
+		});
+
+		it('should handle Redis int to Lua type conversion', function() {
+			return client.set('incr key', 0)
+				.then(function(reply) {
+					reply.should.equal('OK');
+					return client.eval('local foo = redis.call(\'incr\',\'incr key\')\n' + 'return {type(foo),foo}', 0);
+				})
+				.then(function(reply) {
+					Array.isArray(reply).should.equal(true);
+					reply.length.should.equal(2);
+					reply.should.deep.equal(['number', 1]);
+				});
+		});
+
+		it('should handle Redis bulk to Lua type conversion', function() {
+			return client.set('bulk reply key', 'bulk reply value')
+				.then(function(reply) {
+					reply.should.equal('OK');
+					return client.eval('local foo = redis.call(\'get\',\'bulk reply key\'); return {type(foo),foo}', 0);
+				})
+				.then(function(reply) {
+					Array.isArray(reply).should.equal(true);
+					reply.length.should.equal(2);
+					reply.should.deep.equal(['string', 'bulk reply value']);
+				});
+		});
+
+		it('should handle Redis multi bulk to Lua type conversion', function() {
+			return client.multi()
+				.del('mylist')
+				.rpush('mylist', 'a')
+				.rpush('mylist', 'b')
+				.rpush('mylist', 'c')
+				.exec()
+				.then(function(replies) {
+					Array.isArray(replies).should.equal(true);
+					replies.length.should.equal(4);
+					return client.eval('local foo = redis.call(\'lrange\',\'mylist\',0,-1); return {type(foo),foo[1],foo[2],foo[3],# foo}', 0);
+				})
+				.then(function(replies) {
+					Array.isArray(replies).should.equal(true);
+					replies.length.should.equal(5);
+					replies.should.deep.equal(['table', 'a', 'b', 'c', 3]);
+				});
+		});
+
+		it('should handle Redis status reply to Lua type conversion', function() {
+			return client.eval('local foo = redis.call(\'set\',\'mykey\',\'myval\'); return {type(foo),foo[\'ok\']}', 0)
+				.then(function(reply) {
+					Array.isArray(reply).should.equal(true);
+					reply.length.should.equal(2);
+					reply.should.deep.equal(['table', 'OK']);
+				});
+		});
+
+		it('should handle Redis error reply to Lua type conversion', function() {
+			return client.set('error reply key', 'error reply value')
+				.then(function(reply) {
+					reply.should.equal('OK');
+					return client.eval('local foo = redis.pcall(\'incr\',\'error reply key\'); return {type(foo),foo[\'err\']}', 0);
+				})
+				.then(function(reply) {
+					Array.isArray(reply).should.equal(true);
+					reply.length.should.equal(2);
+					reply.should.deep.equal(['table', 'ERR value is not an integer or out of range']);
 				});
 		});
 	});
