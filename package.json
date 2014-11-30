@@ -1,6 +1,6 @@
 {
   "name": "redis-promised",
-  "version": "1.0.0",
+  "version": "0.10.0",
   "description": "Redis client library with promise support",
   "main": "index.js",
   "scripts": {
