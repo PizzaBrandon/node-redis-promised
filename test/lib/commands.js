@@ -274,6 +274,11 @@ describe('test redis commands', function() {
 		});
 
 		it('should handle Redis int to Lua type conversion', function() {
+			if (!checkMinServerVersion([2, 6, 0])) {
+				console.log('Skipping for old Redis server version < 2.6.0');
+				return false;
+			}
+
 			return client.set('incr key', 0)
 				.then(function(reply) {
 					reply.should.equal('OK');
@@ -287,6 +292,11 @@ describe('test redis commands', function() {
 		});
 
 		it('should handle Redis bulk to Lua type conversion', function() {
+			if (!checkMinServerVersion([2, 6, 0])) {
+				console.log('Skipping for old Redis server version < 2.6.0');
+				return false;
+			}
+
 			return client.set('bulk reply key', 'bulk reply value')
 				.then(function(reply) {
 					reply.should.equal('OK');
@@ -300,6 +310,11 @@ describe('test redis commands', function() {
 		});
 
 		it('should handle Redis multi bulk to Lua type conversion', function() {
+			if (!checkMinServerVersion([2, 6, 0])) {
+				console.log('Skipping for old Redis server version < 2.6.0');
+				return false;
+			}
+
 			return client.multi()
 				.del('mylist')
 				.rpush('mylist', 'a')
@@ -319,6 +334,11 @@ describe('test redis commands', function() {
 		});
 
 		it('should handle Redis status reply to Lua type conversion', function() {
+			if (!checkMinServerVersion([2, 6, 0])) {
+				console.log('Skipping for old Redis server version < 2.6.0');
+				return false;
+			}
+
 			return client.eval('local foo = redis.call(\'set\',\'mykey\',\'myval\'); return {type(foo),foo[\'ok\']}', 0)
 				.then(function(reply) {
 					Array.isArray(reply).should.equal(true);
@@ -328,6 +348,11 @@ describe('test redis commands', function() {
 		});
 
 		it('should handle Redis error reply to Lua type conversion', function() {
+			if (!checkMinServerVersion([2, 6, 0])) {
+				console.log('Skipping for old Redis server version < 2.6.0');
+				return false;
+			}
+
 			return client.set('error reply key', 'error reply value')
 				.then(function(reply) {
 					reply.should.equal('OK');
@@ -337,6 +362,24 @@ describe('test redis commands', function() {
 					Array.isArray(reply).should.equal(true);
 					reply.length.should.equal(2);
 					reply.should.deep.equal(['table', 'ERR value is not an integer or out of range']);
+				});
+		});
+
+		it('should handle Redis nil bulk reply to Lua type conversion', function() {
+			if (!checkMinServerVersion([2, 6, 0])) {
+				console.log('Skipping for old Redis server version < 2.6.0');
+				return false;
+			}
+
+			return client.del('nil reply key')
+				.then(function(reply) {
+					reply.should.equal(0);
+					return client.eval('local foo = redis.call(\'get\',\'nil reply key\'); return {type(foo),foo == false}', 0);
+				})
+				.then(function(reply) {
+					Array.isArray(reply).should.equal(true);
+					reply.length.should.equal(2);
+					reply.should.deep.equal(['boolean', 1]);
 				});
 		});
 	});
@@ -400,5 +443,61 @@ describe('test pubsub', function() {
 		client2.subscribe(subchannel);
 
 		client.publish(subchannel, 'Some message');
+	});
+});
+
+describe('script load', function() {
+	var client;
+
+	beforeEach(function(done) {
+		client = redis.createClient(PORT, HOST, {
+			returnBuffers: true
+		});
+
+		client.once('ready', function() {
+			done();
+		});
+	});
+
+	afterEach(function(done) {
+		if (client) {
+			client.quit();
+		}
+		client = null;
+		done();
+	});
+
+	it('should handle loaded scripts', function() {
+		if (!checkMinServerVersion([2, 6, 0])) {
+			console.log('Skipping for old Redis server version < 2.6.0');
+			return false;
+		}
+
+		var command = 'return 1',
+			commandSha = crypto.createHash('sha1').update(command).digest('hex');
+
+		return client.script('load', command)
+			.then(function(reply) {
+				reply.should.equal(commandSha);
+
+				return client.multi()
+					.script('load', command)
+					.exec();
+			})
+			.then(function(replies) {
+				Array.isArray(replies).should.equal(true);
+				replies.length.should.equal(1);
+				replies[0].should.equal(commandSha);
+
+				return client.multi([
+						['script', 'load', command]
+					])
+					.exec();
+			})
+			.then(function(replies) {
+				Array.isArray(replies).should.equal(true);
+				replies.length.should.equal(1);
+				replies[0].should.equal(commandSha);
+			});
 	});
 });

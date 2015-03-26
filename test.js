@@ -116,29 +116,6 @@ next = function next(name) {
 // Tests are run in the order they are defined, so FLUSHDB should always be first.
 
 
-
-tests.EVAL_1 = function () {
-    var name = "EVAL_1";
-
-    if (!server_version_at_least(client, [2, 5, 0])) {
-        console.log("Skipping " + name + " for old Redis server version < 2.5.x");
-        return next(name);
-    }
-//TODO: Start here
-
-    // test {EVAL - Redis nil bulk reply -> Lua type conversion}
-    client.del("nil reply key", function (err, res) {
-        if (err) throw err;
-        client.eval("local foo = redis.call('get','nil reply key'); return {type(foo),foo == false}", 0, function (err, res) {
-            if (err) throw err;
-            assert.strictEqual(2, res.length, name);
-            assert.strictEqual("boolean", res[0], name);
-            assert.strictEqual(1, res[1], name);
-            next(name);
-        });
-    });
-};
-
 tests.SCRIPT_LOAD = function() {
     var name = "SCRIPT_LOAD",
         command = "return 1",
